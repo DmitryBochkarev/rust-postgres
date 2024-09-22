@@ -493,6 +493,11 @@ impl Client {
         copy_out::copy_out(self.inner(), statement).await
     }
 
+    pub async fn copy_out_simple_query(&self, query: &str) -> Result<CopyOutStream, Error>
+    {
+        copy_out::copy_out_simple_query(self.inner(), query).await
+    }
+
     /// Executes a sequence of SQL statements using the simple query protocol, returning the resulting rows.
     ///
     /// Statements should be separated by semicolons. If an error occurs, execution of the sequence will stop at that

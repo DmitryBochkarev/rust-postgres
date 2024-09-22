@@ -209,6 +209,7 @@ pub struct Config {
     pub(crate) target_session_attrs: TargetSessionAttrs,
     pub(crate) channel_binding: ChannelBinding,
     pub(crate) load_balance_hosts: LoadBalanceHosts,
+    pub(crate) replication: Option<String>,
 }
 
 impl Default for Config {
@@ -242,6 +243,7 @@ impl Config {
             target_session_attrs: TargetSessionAttrs::Any,
             channel_binding: ChannelBinding::Prefer,
             load_balance_hosts: LoadBalanceHosts::Disable,
+            replication: None,
         }
     }
 
@@ -659,6 +661,9 @@ impl Config {
                     }
                 };
                 self.load_balance_hosts(load_balance_hosts);
+            }
+            "replication" => {
+                self.replication = Some(value.to_string());
             }
             key => {
                 return Err(Error::config_parse(Box::new(UnknownOption(

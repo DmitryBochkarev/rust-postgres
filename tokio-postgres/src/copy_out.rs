@@ -1,12 +1,13 @@
-use crate::client::{InnerClient, Responses};
+use crate::client::{Client, InnerClient, Responses};
 use crate::codec::FrontendMessage;
 use crate::connection::RequestMessages;
 use crate::{query, slice_iter, Error, Statement};
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use futures_util::{ready, Stream};
 use log::debug;
 use pin_project_lite::pin_project;
 use postgres_protocol::message::backend::Message;
+use postgres_protocol::message::frontend;
 use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -22,16 +23,33 @@ pub async fn copy_out(client: &InnerClient, statement: Statement) -> Result<Copy
     })
 }
 
+pub async fn copy_out_simple_query(client: &InnerClient, query: &str) -> Result<CopyOutStream, Error> {
+    debug!("executing copy out simple query {}", query);
+
+    // let buf = query::encode(client, &statement, slice_iter(&[]))?;
+    let mut buf = BytesMut::new();
+    frontend::query(query, &mut buf).expect("copy out simple query");
+
+    let buf = buf.freeze();
+
+    let responses = start(client, buf).await?;
+    Ok(CopyOutStream {
+        responses,
+        _p: PhantomPinned,
+    })
+}
+
 async fn start(client: &InnerClient, buf: Bytes) -> Result<Responses, Error> {
     let mut responses = client.send(RequestMessages::Single(FrontendMessage::Raw(buf)))?;
 
     match responses.next().await? {
-        Message::BindComplete => {}
-        _ => return Err(Error::unexpected_message()),
-    }
-
-    match responses.next().await? {
-        Message::CopyOutResponse(_) => {}
+        Message::BindComplete => {
+            match responses.next().await? {
+                Message::CopyOutResponse(_) => {}
+                _ => return Err(Error::unexpected_message()),
+            }
+        }
+        Message::CopyBothResponse(_) => {}
         _ => return Err(Error::unexpected_message()),
     }
 

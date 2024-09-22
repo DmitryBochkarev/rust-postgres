@@ -31,6 +31,7 @@ pub const PORTAL_SUSPENDED_TAG: u8 = b's';
 pub const PARAMETER_STATUS_TAG: u8 = b'S';
 pub const PARAMETER_DESCRIPTION_TAG: u8 = b't';
 pub const ROW_DESCRIPTION_TAG: u8 = b'T';
+pub const COPY_BOTH_RESPONSE_TAG: u8 = b'W';
 pub const READY_FOR_QUERY_TAG: u8 = b'Z';
 
 #[derive(Debug, Copy, Clone)]
@@ -93,6 +94,7 @@ pub enum Message {
     CopyDone,
     CopyInResponse(CopyInResponseBody),
     CopyOutResponse(CopyOutResponseBody),
+    CopyBothResponse(CopyBothResponseBody),
     DataRow(DataRowBody),
     EmptyQueryResponse,
     ErrorResponse(ErrorResponseBody),
@@ -185,6 +187,16 @@ impl Message {
                 let len = buf.read_u16::<BigEndian>()?;
                 let storage = buf.read_all();
                 Message::CopyOutResponse(CopyOutResponseBody {
+                    format,
+                    len,
+                    storage,
+                })
+            }
+            COPY_BOTH_RESPONSE_TAG => {
+                let format = buf.read_u8()?;
+                let len = buf.read_u16::<BigEndian>()?;
+                let storage = buf.read_all();
+                Message::CopyBothResponse(CopyBothResponseBody {
                     format,
                     len,
                     storage,
@@ -510,6 +522,27 @@ pub struct CopyOutResponseBody {
 }
 
 impl CopyOutResponseBody {
+    #[inline]
+    pub fn format(&self) -> u8 {
+        self.format
+    }
+
+    #[inline]
+    pub fn column_formats(&self) -> ColumnFormats<'_> {
+        ColumnFormats {
+            remaining: self.len,
+            buf: &self.storage,
+        }
+    }
+}
+
+pub struct CopyBothResponseBody {
+    format: u8,
+    len: u16,
+    storage: Bytes,
+}
+
+impl crate::message::backend::CopyBothResponseBody {
     #[inline]
     pub fn format(&self) -> u8 {
         self.format
